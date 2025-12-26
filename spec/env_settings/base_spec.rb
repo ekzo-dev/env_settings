@@ -120,14 +120,44 @@ RSpec.describe EnvSettings::Base do
   end
 
   describe "setter methods" do
-    it "sets ENV variable" do
-      test_class.app_name = "NewApp"
-      expect(ENV["APP_NAME"]).to eq("NewApp")
+    it "raises ReadOnlyError when no writer is defined" do
+      expect { test_class.app_name = "NewApp" }.to raise_error(
+        EnvSettings::ReadOnlyError,
+        /Cannot write to 'app_name': variable is read-only/
+      )
     end
 
-    it "converts value to string" do
-      test_class.port = 8080
-      expect(ENV["PORT"]).to eq("8080")
+    it "raises ReadOnlyError for integer type without writer" do
+      expect { test_class.port = 8080 }.to raise_error(
+        EnvSettings::ReadOnlyError,
+        /Cannot write to 'port': variable is read-only/
+      )
+    end
+
+    context "with custom writer" do
+      let(:writable_class) do
+        Class.new(EnvSettings::Base) do
+          env :app_name,
+              type: :string,
+              default: "TestApp",
+              writer: ->(key, value, setting) { ENV[key] = value.to_s }
+
+          env :port,
+              type: :integer,
+              default: 3000,
+              writer: ->(key, value, setting) { ENV[key] = value.to_s }
+        end
+      end
+
+      it "sets ENV variable when writer is defined" do
+        writable_class.app_name = "NewApp"
+        expect(ENV["APP_NAME"]).to eq("NewApp")
+      end
+
+      it "converts value to string when writer is defined" do
+        writable_class.port = 8080
+        expect(ENV["PORT"]).to eq("8080")
+      end
     end
   end
 

@@ -117,6 +117,40 @@ Env.allowed_hosts     # => ["localhost", "127.0.0.1"]
 Env.validate!         # Raises ValidationError if required fields missing
 ```
 
+## Recent Updates
+
+### Custom Reader/Writer Callbacks (Added December 2025)
+
+The library now supports custom reader/writer callbacks, enabling flexible storage backends:
+
+**Key features:**
+- Individual variable callbacks via `reader:` and `writer:` options
+- Global callbacks via `default_reader` and `default_writer` class methods
+- Read-only by default (raises `ReadOnlyError` without writer)
+- Callbacks receive `key` and `setting` parameters for context
+- Type coercion still applied to reader results
+- Full backward compatibility
+
+**Usage:**
+```ruby
+class Env < EnvSettings::Base
+  # Custom callbacks per variable
+  env :api_key,
+      reader: ->(key, setting) { Setting.get(key) },
+      writer: ->(key, value, setting) { Setting.set(key, value) }
+
+  # Global defaults for all variables
+  default_reader ->(key, setting) { Setting.get(key) || ENV[key] }
+  default_writer ->(key, value, setting) { Setting.set(key, value) }
+end
+```
+
+**Implementation details:**
+- `ReadOnlyError` exception for write attempts without writer
+- `get_value` checks: custom reader → default_reader → ENV
+- `set_value` checks: custom writer → default_writer → raise ReadOnlyError
+- 28 new tests added in `spec/env_settings/callbacks_spec.rb`
+
 ## Next Steps / TODO
 
 Potential enhancements:
@@ -126,8 +160,8 @@ Potential enhancements:
 - [ ] Add Rails generator for creating Env class
 - [ ] Add support for environment-specific defaults
 - [ ] Add documentation generation from definitions
-- [ ] Add support for encrypted environment variables
-- [ ] Integration with popular secret management tools (Vault, AWS Secrets Manager)
+- [x] ~~Add support for encrypted environment variables~~ (achieved via reader callbacks)
+- [x] ~~Integration with popular secret management tools~~ (achieved via reader callbacks)
 
 ## Development Notes
 

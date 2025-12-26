@@ -3,17 +3,20 @@
 module EnvSettings
   class Error < StandardError; end
   class ValidationError < Error; end
+  class ReadOnlyError < Error; end
 
   class Base
     class << self
-      def env(name, type: :string, default: nil, validates: nil)
+      def env(name, type: :string, default: nil, validates: nil, reader: nil, writer: nil)
         env_key = name.to_s.upcase
 
         settings[name] = {
           type: type,
           default: default,
           validates: validates,
-          env_key: env_key
+          env_key: env_key,
+          reader: reader,
+          writer: writer
         }
 
         define_singleton_method(name) do
@@ -42,11 +45,35 @@ module EnvSettings
         @settings ||= {}
       end
 
+      def default_reader(callable = nil, &block)
+        @default_reader = callable || block
+      end
+
+      def default_writer(callable = nil, &block)
+        @default_writer = callable || block
+      end
+
+      def get_default_reader
+        @default_reader
+      end
+
+      def get_default_writer
+        @default_writer
+      end
+
       def get_value(name)
         setting = settings[name]
         return nil unless setting
 
-        raw_value = ENV[setting[:env_key]]
+        # Use custom reader if provided
+        if setting[:reader]
+          raw_value = setting[:reader].call(setting[:env_key], setting)
+        elsif get_default_reader
+          raw_value = get_default_reader.call(setting[:env_key], setting)
+        else
+          # Default behavior: read from ENV
+          raw_value = ENV[setting[:env_key]]
+        end
 
         if raw_value.nil?
           return setting[:default]
@@ -59,7 +86,15 @@ module EnvSettings
         setting = settings[name]
         return unless setting
 
-        ENV[setting[:env_key]] = value.to_s
+        # Use custom writer if provided
+        if setting[:writer]
+          setting[:writer].call(setting[:env_key], value, setting)
+        elsif get_default_writer
+          get_default_writer.call(setting[:env_key], value, setting)
+        else
+          # Default behavior: raise error (read-only)
+          raise ReadOnlyError, "Cannot write to '#{name}': variable is read-only. Provide a writer callback to enable writing."
+        end
       end
 
       def coerce_value(value, type)

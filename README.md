@@ -10,6 +10,8 @@ Type-safe environment variables management for Ruby applications with a clean DS
 - 🎨 Clean, Rails-like DSL
 - 📝 Default values
 - 🔍 Boolean helper methods
+- 🔄 Custom reader/writer callbacks for flexible storage (database, Redis, files, etc.)
+- 🛡️ Read-only by default for security
 - 🧪 Fully tested
 
 ## Installation
@@ -49,6 +51,8 @@ class Env < EnvSettings::Base
 end
 ```
 
+By default, all variables are **read-only** and read from `ENV`. To enable writing or custom storage, see [Custom Reader/Writer Callbacks](#custom-readerwriter-callbacks).
+
 ### Reading Values
 
 ```ruby
@@ -69,12 +73,22 @@ Env.to_h              # Same as .all
 
 ### Setting Values
 
-```ruby
-Env.app_name = "NewApp"
-Env.port = 8080
-```
+**Important:** By default, all variables are read-only. To enable writing, you must provide a `writer` callback.
 
-Note: Setting values updates the actual `ENV` hash.
+```ruby
+# This will raise ReadOnlyError
+Env.app_name = "NewApp"  # ❌ EnvSettings::ReadOnlyError
+
+# To make a variable writable, provide a writer callback
+class Env < EnvSettings::Base
+  env :app_name,
+      type: :string,
+      default: "MyApp",
+      writer: ->(key, value, setting) { ENV[key] = value.to_s }
+end
+
+Env.app_name = "NewApp"  # ✅ Works
+```
 
 ### Supported Types
 
@@ -234,6 +248,216 @@ config.cache_store = :redis_cache_store, { url: Env.redis_url }
 # Anywhere in your code
 if Env.enable_cache?
   # Do something
+end
+```
+
+## Custom Reader/Writer Callbacks
+
+EnvSettings allows you to define custom callbacks for reading and writing variables, enabling flexible storage backends like databases, Redis, or files.
+
+### Individual Variable Callbacks
+
+```ruby
+class Env < EnvSettings::Base
+  # Read-only from ENV (default behavior)
+  env :database_url, type: :string, validates: { presence: true }
+
+  # Custom reader from database
+  env :maintenance_mode,
+      type: :boolean,
+      default: false,
+      reader: ->(key, setting) { Setting.find_by(key: key)&.value }
+
+  # Custom reader and writer
+  env :feature_flags,
+      type: :hash,
+      default: {},
+      reader: ->(key, setting) {
+        value = Redis.current.get("settings:#{key}")
+        value ? JSON.parse(value) : nil
+      },
+      writer: ->(key, value, setting) {
+        Redis.current.set("settings:#{key}", value.to_json)
+      }
+end
+
+# Usage
+Env.maintenance_mode           # Reads from database
+Env.feature_flags = { x: true } # Writes to Redis
+Env.database_url = "new"       # ❌ ReadOnlyError (no writer)
+```
+
+### Global Default Callbacks
+
+Set default reader/writer for all variables:
+
+```ruby
+class Env < EnvSettings::Base
+  # All variables will use these callbacks by default
+  default_reader ->(key, setting) {
+    Setting.find_by(key: key)&.value || ENV[key]
+  }
+
+  default_writer ->(key, value, setting) {
+    Setting.find_or_create_by(key: key).update!(value: value)
+  }
+
+  # Now all variables are readable/writable through database
+  env :api_key, type: :string, default: "default_key"
+  env :timeout, type: :integer, default: 30
+
+  # Can override for specific variables
+  env :secret_key,
+      type: :string,
+      reader: ->(key, setting) { ENV[key] },  # Only from ENV
+      writer: nil                              # Explicitly read-only
+end
+
+# Block syntax is also supported
+class Env < EnvSettings::Base
+  default_reader do |key, setting|
+    Setting.find_by(key: key)&.value || ENV[key]
+  end
+
+  default_writer do |key, value, setting|
+    Setting.find_or_create_by(key: key).update!(value: value)
+  end
+end
+```
+
+### Callback Parameters
+
+Callbacks receive the following parameters:
+
+- `key` - The uppercase ENV key (e.g., "API_KEY")
+- `setting` - Full configuration hash with: `:type`, `:default`, `:validates`, `:env_key`, etc.
+
+**Reader callback:**
+```ruby
+reader: ->(key, setting) {
+  # Must return raw value (string/nil)
+  # Type coercion is applied automatically
+}
+```
+
+**Writer callback:**
+```ruby
+writer: ->(key, value, setting) {
+  # Receives the value to write
+  # No return value expected
+}
+```
+
+### Practical Examples
+
+#### ActiveRecord Storage
+
+```ruby
+class Env < EnvSettings::Base
+  default_reader ->(key, setting) {
+    Setting.find_by(key: key)&.value || ENV[key]
+  }
+
+  default_writer ->(key, value, setting) {
+    Setting.find_or_create_by(key: key).update!(value: value)
+  }
+
+  env :maintenance_mode, type: :boolean, default: false
+  env :max_connections, type: :integer, default: 10
+end
+```
+
+#### Redis Storage
+
+```ruby
+class Env < EnvSettings::Base
+  default_reader ->(key, setting) {
+    Redis.current.get("app:settings:#{key}")
+  }
+
+  default_writer ->(key, value, setting) {
+    Redis.current.set("app:settings:#{key}", value.to_s)
+  }
+
+  env :rate_limit, type: :integer, default: 100
+  env :feature_x_enabled, type: :boolean, default: false
+end
+```
+
+#### YAML File Storage
+
+```ruby
+class Env < EnvSettings::Base
+  SETTINGS_FILE = "config/runtime_settings.yml"
+
+  default_reader ->(key, setting) {
+    return ENV[key] unless File.exist?(SETTINGS_FILE)
+    YAML.load_file(SETTINGS_FILE)[key]
+  }
+
+  default_writer ->(key, value, setting) {
+    data = File.exist?(SETTINGS_FILE) ? YAML.load_file(SETTINGS_FILE) : {}
+    data[key] = value.to_s
+    File.write(SETTINGS_FILE, data.to_yaml)
+  }
+
+  env :log_level, type: :symbol, default: :info
+end
+```
+
+#### Vault/Secrets Manager
+
+```ruby
+class Env < EnvSettings::Base
+  env :api_key,
+      type: :string,
+      reader: ->(key, setting) {
+        Vault.logical.read("secret/data/#{key}")&.data&.dig(:data, :value)
+      },
+      writer: ->(key, value, setting) {
+        Vault.logical.write("secret/data/#{key}", data: { value: value })
+      }
+end
+```
+
+#### Mixed Strategy
+
+```ruby
+class Env < EnvSettings::Base
+  # Default: read from ENV (no writer = read-only)
+  env :database_url, type: :string, validates: { presence: true }
+
+  # Runtime settings in database
+  env :maintenance_mode,
+      type: :boolean,
+      default: false,
+      reader: ->(key, setting) { Setting.get(key) },
+      writer: ->(key, value, setting) { Setting.set(key, value) }
+
+  # Feature flags in Redis
+  env :feature_flags,
+      type: :hash,
+      default: {},
+      reader: ->(key, setting) { JSON.parse(Redis.current.get(key) || "{}") },
+      writer: ->(key, value, setting) { Redis.current.set(key, value.to_json) }
+
+  # Secrets in Vault
+  env :stripe_secret_key,
+      type: :string,
+      reader: ->(key, setting) { Vault.read("secret/#{key}") }
+      # No writer = read-only
+end
+```
+
+### Error Handling
+
+```ruby
+# ReadOnlyError is raised when trying to write without a writer
+begin
+  Env.database_url = "new_url"
+rescue EnvSettings::ReadOnlyError => e
+  puts e.message
+  # => "Cannot write to 'database_url': variable is read-only. Provide a writer callback to enable writing."
 end
 ```
 
