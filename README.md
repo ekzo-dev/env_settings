@@ -233,6 +233,35 @@ It's recommended to run validations during application initialization:
 Env.validate!
 ```
 
+### Automatic Validation on Write
+
+When you assign a value to a variable with validations, it's automatically validated **before** writing to storage:
+
+```ruby
+class Env < EnvSettings::Base
+  default_writer ->(key, value, setting) { Setting.find_or_create_by(key: key).update!(value: value) }
+
+  var :username,
+      type: :string,
+      validates: { presence: true, length: { minimum: 3, maximum: 20 } }
+
+  var :email,
+      type: :string,
+      validates: { format: { with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i } }
+end
+
+# These will raise ValidationError BEFORE writing to database
+Env.username = ""           # Raises: "Username can't be blank"
+Env.username = "ab"         # Raises: "Username is too short (minimum is 3 characters)"
+Env.email = "invalid"       # Raises: "Email is invalid"
+
+# Only valid values are written to storage
+Env.username = "john"       # Works - writes to database
+Env.email = "j@example.com" # Works - writes to database
+```
+
+This prevents invalid data from being stored and ensures data integrity at the assignment level.
+
 ## ActiveModel Validations (Optional)
 
 EnvSettings automatically uses ActiveModel validations if `activemodel` gem is available. This provides:

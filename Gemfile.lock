@@ -77,7 +77,7 @@ PLATFORMS
   x86_64-darwin-23
 
 DEPENDENCIES
-  activemodel (~> 7.0)
+  activemodel (>= 7.1.0)
   env_settings!
   irb
   rake (~> 13.0)

@@ -74,19 +74,34 @@ module EnvSettings
           # Определяем методы для чтения значений
           parent_class.settings.keys.each do |key|
             define_method(key) do
-              parent_class.get_value(key)
+              # Check if value is set on instance, otherwise read from parent
+              ivar = "@#{key}"
+              if instance_variable_defined?(ivar)
+                instance_variable_get(ivar)
+              else
+                parent_class.get_value(key)
+              end
             end
 
-            # Define attr accessor for ActiveModel
-            attr_accessor key unless method_defined?(key)
+            define_method("#{key}=") do |value|
+              instance_variable_set("@#{key}", value)
+            end
           end
 
           # Метод для обновления определений атрибутов при добавлении новых var
           def self.add_attribute(name, parent_class)
             define_method(name) do
-              parent_class.get_value(name)
+              ivar = "@#{name}"
+              if instance_variable_defined?(ivar)
+                instance_variable_get(ivar)
+              else
+                parent_class.get_value(name)
+              end
             end
-            attr_accessor name unless method_defined?(name)
+
+            define_method("#{name}=") do |value|
+              instance_variable_set("@#{name}", value)
+            end
           end
 
           # Для ActiveModel error messages
@@ -136,6 +151,9 @@ module EnvSettings
       def set_value(name, value)
         setting = settings[name]
         return unless setting
+
+        # Validate before writing if validations are defined
+        validate_var!(name, value) if setting[:validates]
 
         # Use custom writer if provided
         if setting[:writer]
@@ -194,6 +212,79 @@ module EnvSettings
         end
       end
 
+      def validate_var!(name, value)
+        setting = settings[name]
+        return unless setting && setting[:validates]
+
+        validators = setting[:validates]
+
+        # Use ActiveModel validations if available
+        if defined?(ActiveModel::Validations) && validator_class
+          # Use existing validator_class for full validation context
+          instance = validator_class.new
+
+          # Set the value being validated
+          instance.send("#{name}=", value)
+
+          # Validate only the specified attribute (Rails 7.1+)
+          if instance.respond_to?(:validate)
+            instance.validate(name)
+          else
+            instance.valid?
+          end
+
+          attribute_errors = instance.errors[name]
+
+          if attribute_errors.any?
+            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} #{attribute_errors.join(', ')}"
+          end
+          return
+        end
+
+        # Run simple validations (when ActiveModel is not available)
+        # Presence validation
+        if validators[:presence] && (value.nil? || value.to_s.empty?)
+          raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} can't be blank"
+        end
+
+        # Length validation
+        if validators[:length] && value
+          length_opts = validators[:length]
+          length = value.to_s.length
+
+          if length_opts[:minimum] && length < length_opts[:minimum]
+            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is too short (minimum is #{length_opts[:minimum]} characters)"
+          end
+
+          if length_opts[:maximum] && length > length_opts[:maximum]
+            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is too long (maximum is #{length_opts[:maximum]} characters)"
+          end
+
+          if length_opts[:in] && !length_opts[:in].include?(length)
+            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is the wrong length (should be #{length_opts[:in]} characters)"
+          end
+        end
+
+        # Format validation
+        if validators[:format] && value
+          format_opts = validators[:format]
+          format_regex = format_opts.is_a?(Hash) ? format_opts[:with] : format_opts
+          unless value.to_s.match?(format_regex)
+            message = format_opts.is_a?(Hash) && format_opts[:message] ? format_opts[:message] : "is invalid"
+            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} #{message}"
+          end
+        end
+
+        # Inclusion validation
+        if validators[:inclusion] && value
+          inclusion_opts = validators[:inclusion]
+          inclusion_values = inclusion_opts.is_a?(Hash) ? inclusion_opts[:in] : inclusion_opts
+          unless inclusion_values.include?(value)
+            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is not included in the list"
+          end
+        end
+      end
+
       def validate!
         # Use ActiveModel validations if available
         if defined?(ActiveModel::Validations) && validator_class
@@ -207,51 +298,7 @@ module EnvSettings
         # Run simple validations (when ActiveModel is not available)
         settings.each do |name, config|
           next unless config[:validates]
-
-          value = get_value(name)
-          validators = config[:validates]
-
-          # Presence validation
-          if validators[:presence] && (value.nil? || value.to_s.empty?)
-            raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} can't be blank"
-          end
-
-          # Length validation
-          if validators[:length] && value
-            length_opts = validators[:length]
-            length = value.to_s.length
-
-            if length_opts[:minimum] && length < length_opts[:minimum]
-              raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is too short (minimum is #{length_opts[:minimum]} characters)"
-            end
-
-            if length_opts[:maximum] && length > length_opts[:maximum]
-              raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is too long (maximum is #{length_opts[:maximum]} characters)"
-            end
-
-            if length_opts[:in] && !length_opts[:in].include?(length)
-              raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is the wrong length (should be #{length_opts[:in]} characters)"
-            end
-          end
-
-          # Format validation
-          if validators[:format] && value
-            format_opts = validators[:format]
-            format_regex = format_opts.is_a?(Hash) ? format_opts[:with] : format_opts
-            unless value.to_s.match?(format_regex)
-              message = format_opts.is_a?(Hash) && format_opts[:message] ? format_opts[:message] : "is invalid"
-              raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} #{message}"
-            end
-          end
-
-          # Inclusion validation
-          if validators[:inclusion] && value
-            inclusion_opts = validators[:inclusion]
-            inclusion_values = inclusion_opts.is_a?(Hash) ? inclusion_opts[:in] : inclusion_opts
-            unless inclusion_values.include?(value)
-              raise ValidationError, "#{name.to_s.capitalize.gsub('_', ' ')} is not included in the list"
-            end
-          end
+          validate_var!(name, get_value(name))
         end
       end
 
