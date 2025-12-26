@@ -166,7 +166,7 @@ RSpec.describe EnvSettings::Base do
       it "raises error when required field is missing" do
         expect { test_class.validate! }.to raise_error(
           EnvSettings::ValidationError,
-          /database_url is required/
+          /Database url can't be blank/
         )
       end
 
@@ -208,7 +208,7 @@ RSpec.describe EnvSettings::Base do
     context "format validation" do
       let(:test_class_with_format) do
         Class.new(EnvSettings::Base) do
-          var :email, validates: { format: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i }
+          var :email, validates: { format: { with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i } }
         end
       end
 
@@ -216,7 +216,7 @@ RSpec.describe EnvSettings::Base do
         ENV["EMAIL"] = "invalid-email"
         expect { test_class_with_format.validate! }.to raise_error(
           EnvSettings::ValidationError,
-          /invalid format/
+          /Email is invalid/
         )
       end
 
@@ -229,7 +229,7 @@ RSpec.describe EnvSettings::Base do
     context "inclusion validation" do
       let(:test_class_with_inclusion) do
         Class.new(EnvSettings::Base) do
-          var :environment, validates: { inclusion: %w[development test production] }
+          var :environment, validates: { inclusion: { in: %w[development test production] } }
         end
       end
 
@@ -237,7 +237,7 @@ RSpec.describe EnvSettings::Base do
         ENV["ENVIRONMENT"] = "staging"
         expect { test_class_with_inclusion.validate! }.to raise_error(
           EnvSettings::ValidationError,
-          /must be one of/
+          /is not included in the list/
         )
       end
 

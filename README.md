@@ -12,6 +12,7 @@ Type-safe environment variables management for Ruby applications with a clean DS
 - 🔍 Boolean helper methods
 - 🔄 Custom reader/writer callbacks for flexible storage (database, Redis, files, etc.)
 - 🛡️ Read-only by default for security
+- 🔬 ActiveModel validations support (optional)
 - 🧪 Fully tested
 
 ## Installation
@@ -186,7 +187,15 @@ var :username, validates: {
 
 ```ruby
 var :email, validates: {
-  format: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i
+  format: { with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i }
+}
+
+# With custom message
+var :email, validates: {
+  format: {
+    with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i,
+    message: "must be a valid email address"
+  }
 }
 ```
 
@@ -194,7 +203,7 @@ var :email, validates: {
 
 ```ruby
 var :environment, validates: {
-  inclusion: %w[development test production]
+  inclusion: { in: %w[development test production] }
 }
 ```
 
@@ -204,7 +213,7 @@ var :environment, validates: {
 var :api_key, validates: {
   presence: true,
   length: { minimum: 32 },
-  format: /\A[a-zA-Z0-9]+\z/
+  format: { with: /\A[a-zA-Z0-9]+\z/ }
 }
 ```
 
@@ -223,6 +232,100 @@ It's recommended to run validations during application initialization:
 # config/initializers/env_settings.rb (Rails)
 Env.validate!
 ```
+
+## ActiveModel Validations (Optional)
+
+EnvSettings automatically uses ActiveModel validations if `activemodel` gem is available. This provides:
+
+- More validation options (numericality, comparison, exclusion, etc.)
+- Better error messages with I18n support
+- Custom validators
+- Full compatibility with Rails
+
+### Installation with ActiveModel
+
+```ruby
+# Gemfile
+gem 'env_settings'
+gem 'activemodel'  # Optional, but recommended for Rails projects
+```
+
+### ActiveModel Validation Examples
+
+```ruby
+class Env < EnvSettings::Base
+  # Numericality validation
+  var :port,
+      type: :integer,
+      default: 3000,
+      validates: {
+        numericality: {
+          only_integer: true,
+          greater_than: 0,
+          less_than: 65536
+        }
+      }
+
+  var :timeout,
+      type: :float,
+      validates: {
+        numericality: { greater_than_or_equal_to: 0 }
+      }
+
+  # Comparison validation
+  var :min_value, type: :integer, default: 0
+  var :max_value,
+      type: :integer,
+      default: 100,
+      validates: {
+        comparison: { greater_than: :min_value }
+      }
+
+  # Exclusion validation
+  var :username,
+      validates: {
+        exclusion: { in: %w[admin root superuser] }
+      }
+
+  # Absence validation (for deprecated variables)
+  var :legacy_option,
+      validates: { absence: true }
+
+  # Custom validators
+  var :api_endpoint,
+      validates: { url: true }  # Uses custom UrlValidator
+end
+```
+
+### Validation Syntax
+
+EnvSettings uses **ActiveModel-compatible validation syntax**. This means:
+
+- **With ActiveModel** (`activemodel` gem installed): Full ActiveModel validations with rich features
+- **Without ActiveModel**: Built-in simple validations with the same syntax but limited to: `presence`, `length`, `format`, `inclusion`
+
+The syntax is identical in both cases, so your code works seamlessly:
+
+```ruby
+# This syntax works with AND without activemodel
+var :email, validates: {
+  presence: true,
+  format: { with: /regex/, message: "is not valid" }
+}
+
+# ActiveModel-only validators (requires activemodel gem)
+var :age, validates: {
+  numericality: { greater_than: 0, less_than: 150 }  # ✅ With ActiveModel
+                                                       # ❌ Without ActiveModel
+}
+
+var :password, validates: {
+  confirmation: true  # ✅ With ActiveModel
+                      # ❌ Without ActiveModel
+}
+```
+
+**Recommendation**: Install `activemodel` gem for Rails projects to get full validation features.
 
 ### Rails Integration
 
