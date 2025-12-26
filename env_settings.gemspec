@@ -5,8 +5,8 @@ require_relative "lib/env_settings/version"
 Gem::Specification.new do |spec|
   spec.name = "env_settings"
   spec.version = EnvSettings::VERSION
-  spec.authors = ["Архипов Дмитрий"]
-  spec.email = ["da@netcitylife.ru"]
+  spec.authors = ["Dmitry Arkhipov"]
+  spec.email = ["d.arkhipov@ekzo.dev"]
 
   spec.summary = "Type-safe environment variables management for Ruby applications"
   spec.description = "EnvSettings provides a clean DSL for managing environment variables with type coercion, validations, and default values"
