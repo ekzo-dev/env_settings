@@ -4,16 +4,16 @@ Type-safe environment variables management for Ruby applications with a clean DS
 
 ## Features
 
-- 🔒 Type-safe environment variable access
-- 🎯 Support for multiple types: string, integer, float, boolean, array, hash, symbol
-- ✅ Built-in validations (presence, length, format, inclusion)
-- 🎨 Clean, Rails-like DSL
-- 📝 Default values
-- 🔍 Boolean helper methods
-- 🔄 Custom reader/writer callbacks for flexible storage (database, Redis, files, etc.)
-- 🛡️ Read-only by default for security
-- 🔬 ActiveModel validations support (optional)
-- 🧪 Fully tested
+- Type-safe environment variable access
+- Support for multiple types: string, integer, float, boolean, array, hash, symbol
+- Built-in validations (presence, length, format, inclusion)
+- Clean, Rails-like DSL
+- Default values
+- Boolean helper methods
+- Custom reader/writer callbacks for flexible storage (database, Redis, files, etc.)
+- Read-only by default for security
+- ActiveModel validations support (optional)
+- Fully tested
 
 ## Installation
 
@@ -79,7 +79,7 @@ Env.to_h              # Same as .all
 
 ```ruby
 # This will raise ReadOnlyError
-Env.app_name = "NewApp" # ❌ EnvSettings::ReadOnlyError
+Env.app_name = "NewApp" # Raises EnvSettings::ReadOnlyError
 
 # To make a variable writable, provide a writer callback
 class Env < EnvSettings::Base
@@ -89,7 +89,7 @@ class Env < EnvSettings::Base
       writer: ->(key, value, setting) { ENV[key] = value.to_s }
 end
 
-Env.app_name = "NewApp" # ✅ Works
+Env.app_name = "NewApp" # Works
 ```
 
 ### Supported Types
@@ -315,13 +315,11 @@ var :email, validates: {
 
 # ActiveModel-only validators (requires activemodel gem)
 var :age, validates: {
-  numericality: { greater_than: 0, less_than: 150 }  # ✅ With ActiveModel
-                                                       # ❌ Without ActiveModel
+  numericality: { greater_than: 0, less_than: 150 }  # Only with ActiveModel
 }
 
 var :password, validates: {
-  confirmation: true  # ✅ With ActiveModel
-                      # ❌ Without ActiveModel
+  confirmation: true  # Only with ActiveModel
 }
 ```
 
@@ -401,7 +399,7 @@ end
 # Usage
 Env.maintenance_mode # Reads from database
 Env.feature_flags = { x: true } # Writes to Redis
-Env.database_url = "new" # ❌ ReadOnlyError (no writer)
+Env.database_url = "new" # Raises ReadOnlyError (no writer)
 ```
 
 ### Global Default Callbacks
@@ -569,6 +567,107 @@ class Env < EnvSettings::Base
       type: :string,
       reader: ->(key, setting) { Vault.read("secret/#{key}") }
   # No writer = read-only
+end
+```
+
+### Additional Use Cases
+
+#### Runtime Configuration with Database
+
+Settings that can be changed through admin panel without restart:
+
+```ruby
+# ActiveRecord model
+class Setting < ApplicationRecord
+  # Table: settings (key:string, value:text)
+
+  def self.get(key)
+    find_by(key: key)&.value
+  end
+
+  def self.set(key, value)
+    find_or_create_by(key: key).update!(value: value.to_s)
+  end
+end
+
+# EnvSettings configuration
+class Env < EnvSettings::Base
+  default_reader ->(key, setting) { Setting.get(key) || ENV[key] }
+  default_writer ->(key, value, setting) { Setting.set(key, value) }
+
+  var :maintenance_mode, type: :boolean, default: false
+  var :max_upload_size, type: :integer, default: 10_485_760
+  var :feature_x_enabled, type: :boolean, default: false
+end
+
+# Usage in admin controller
+class AdminController < ApplicationController
+  def toggle_maintenance
+    Env.maintenance_mode = params[:enabled]
+    redirect_to admin_path, notice: "Maintenance mode updated"
+  end
+end
+```
+
+#### Feature Flags with Redis
+
+Fast feature flags with minimal latency:
+
+```ruby
+class Env < EnvSettings::Base
+  var :feature_flags,
+      type: :hash,
+      default: {},
+      reader: ->(key, setting) {
+        value = Redis.current.get("flags:#{key}")
+        value ? JSON.parse(value) : nil
+      },
+      writer: ->(key, value, setting) {
+        Redis.current.set("flags:#{key}", value.to_json)
+      }
+end
+
+# Usage
+Env.feature_flags = {
+  new_ui: true,
+  beta_feature: false
+}
+
+if Env.feature_flags[:new_ui]
+  render :new_design
+else
+  render :old_design
+end
+```
+
+#### Caching Expensive Operations
+
+```ruby
+class Env < EnvSettings::Base
+  @vault_cache = {}
+
+  var :secret_key,
+      reader: ->(key, setting) {
+        @vault_cache[key] ||= begin
+          secret = Vault.logical.read("secret/#{key}")
+          secret&.data&.dig(:data, :value)
+        end
+      }
+end
+```
+
+#### Logging Changes
+
+```ruby
+class Env < EnvSettings::Base
+  default_writer ->(key, value, setting) {
+    old_value = Setting.get(key)
+    Setting.set(key, value)
+
+    Rails.logger.info(
+      "Setting changed: #{key} = #{value.inspect} (was: #{old_value.inspect})"
+    )
+  }
 end
 ```
 

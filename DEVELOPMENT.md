@@ -155,17 +155,37 @@ end
 - `set_value` checks: custom writer → default_writer → raise ReadOnlyError
 - 28 new tests added in `spec/env_settings/callbacks_spec.rb`
 
+### ActiveModel Integration & Unified Syntax (December 2025)
+
+**Unified validation syntax:**
+- All validations now use ActiveModel-compatible syntax
+- `format: { with: /regex/ }` instead of `format: /regex/`
+- `inclusion: { in: array }` instead of `inclusion: array`
+- Works with and without ActiveModel gem
+
+**ActiveModel integration:**
+- Optional dependency on `activemodel` gem
+- Automatic detection and usage when available
+- Validator class pattern for compatibility
+- Full test coverage: 87 tests passing
+
+**Method renamed:**
+- `env` → `var` to avoid redundancy
+- Cleaner API: `var :name` instead of `env :name`
+
 ## Next Steps / TODO
 
 Potential enhancements:
 - [ ] Add support for nested environment variables
 - [ ] Add caching mechanism for parsed values
-- [ ] Add support for .var file loading
+- [ ] Add support for .env file loading
 - [ ] Add Rails generator for creating Env class
 - [ ] Add support for environment-specific defaults
 - [ ] Add documentation generation from definitions
 - [x] ~~Add support for encrypted environment variables~~ (achieved via reader callbacks)
 - [x] ~~Integration with popular secret management tools~~ (achieved via reader callbacks)
+- [x] ~~ActiveModel validations support~~ (completed December 2025)
+- [x] ~~Unified validation syntax~~ (completed December 2025)
 
 ## Development Notes
 
