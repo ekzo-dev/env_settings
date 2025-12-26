@@ -9,18 +9,19 @@ EnvSettings поддерживает кастомные колбеки для ч
 ### 1. По умолчанию все переменные read-only
 
 ```ruby
+
 class Env < EnvSettings::Base
-  env :database_url, type: :string
+  var :database_url, type: :string
 end
 
-Env.database_url         # ✅ Читает из ENV['DATABASE_URL']
+Env.database_url # ✅ Читает из ENV['DATABASE_URL']
 Env.database_url = "new" # ❌ EnvSettings::ReadOnlyError
 ```
 
 ### 2. Reader определяет откуда читать
 
 ```ruby
-env :api_key,
+var :api_key,
     reader: ->(key, setting) {
       # key = "API_KEY"
       # setting = { type: :string, default: nil, ... }
@@ -31,7 +32,7 @@ env :api_key,
 ### 3. Writer определяет куда писать
 
 ```ruby
-env :api_key,
+var :api_key,
     writer: ->(key, value, setting) {
       # key = "API_KEY"
       # value = то что присваивается
@@ -43,13 +44,14 @@ env :api_key,
 ### 4. Глобальные колбеки для всех переменных
 
 ```ruby
+
 class Env < EnvSettings::Base
   default_reader ->(key, setting) { Setting.get(key) || ENV[key] }
   default_writer ->(key, value, setting) { Setting.set(key, value) }
 
   # Все переменные используют эти колбеки
-  env :api_key, type: :string
-  env :timeout, type: :integer
+  var :api_key, type: :string
+  var :timeout, type: :integer
 end
 ```
 
@@ -60,16 +62,17 @@ end
 **Задача:** Критичные настройки должны задаваться только через ENV.
 
 ```ruby
+
 class Env < EnvSettings::Base
   # Читаем из ENV, запись запрещена
-  env :database_url, type: :string, validates: { presence: true }
-  env :secret_key, type: :string, validates: { presence: true }
-  env :redis_url, type: :string, default: "redis://localhost:6379"
+  var :database_url, type: :string, validates: { presence: true }
+  var :secret_key, type: :string, validates: { presence: true }
+  var :redis_url, type: :string, default: "redis://localhost:6379"
 end
 
 # Использование
-Env.database_url              # Читает из ENV
-Env.database_url = "new"      # ReadOnlyError
+Env.database_url # Читает из ENV
+Env.database_url = "new" # ReadOnlyError
 ```
 
 ### Сценарий 2: Runtime настройки в базе данных
@@ -101,14 +104,14 @@ class Env < EnvSettings::Base
     Setting.set(key, value)
   }
 
-  env :maintenance_mode, type: :boolean, default: false
-  env :max_upload_size, type: :integer, default: 10_485_760
-  env :feature_x_enabled, type: :boolean, default: false
+  var :maintenance_mode, type: :boolean, default: false
+  var :max_upload_size, type: :integer, default: 10_485_760
+  var :feature_x_enabled, type: :boolean, default: false
 end
 
 # Использование
-Env.maintenance_mode = true   # Сохраняется в БД
-Env.maintenance_mode          # Читается из БД (или ENV если нет в БД)
+Env.maintenance_mode = true # Сохраняется в БД
+Env.maintenance_mode # Читается из БД (или ENV если нет в БД)
 
 # В админке
 class AdminController < ApplicationController
@@ -124,8 +127,9 @@ end
 **Задача:** Быстрые feature flags с минимальной латентностью.
 
 ```ruby
+
 class Env < EnvSettings::Base
-  env :feature_flags,
+  var :feature_flags,
       type: :hash,
       default: {},
       reader: ->(key, setting) {
@@ -162,17 +166,17 @@ Vault.token = ENV['VAULT_TOKEN']
 
 class Env < EnvSettings::Base
   # Обычные настройки из ENV
-  env :database_url, type: :string
+  var :database_url, type: :string
 
   # Секреты из Vault (read-only)
-  env :stripe_secret_key,
+  var :stripe_secret_key,
       type: :string,
       reader: ->(key, setting) {
         secret = Vault.logical.read("secret/data/#{key}")
         secret&.data&.dig(:data, :value)
       }
 
-  env :aws_secret_key,
+  var :aws_secret_key,
       type: :string,
       reader: ->(key, setting) {
         secret = Vault.logical.read("secret/data/#{key}")
@@ -181,8 +185,8 @@ class Env < EnvSettings::Base
 end
 
 # Использование
-Stripe.api_key = Env.stripe_secret_key  # Читается из Vault
-Env.stripe_secret_key = "new"           # ReadOnlyError (нет writer)
+Stripe.api_key = Env.stripe_secret_key # Читается из Vault
+Env.stripe_secret_key = "new" # ReadOnlyError (нет writer)
 ```
 
 ### Сценарий 5: Гибридная конфигурация
@@ -190,21 +194,22 @@ Env.stripe_secret_key = "new"           # ReadOnlyError (нет writer)
 **Задача:** Разные переменные в разных хранилищах.
 
 ```ruby
+
 class Env < EnvSettings::Base
   # 1. Критичные настройки: только ENV (read-only)
-  env :database_url,
+  var :database_url,
       type: :string,
       validates: { presence: true }
 
   # 2. Runtime настройки: база данных (read-write)
-  env :maintenance_mode,
+  var :maintenance_mode,
       type: :boolean,
       default: false,
       reader: ->(key, setting) { Setting.get(key) || ENV[key] },
       writer: ->(key, value, setting) { Setting.set(key, value) }
 
   # 3. Feature flags: Redis (read-write)
-  env :features,
+  var :features,
       type: :hash,
       default: {},
       reader: ->(key, setting) {
@@ -215,7 +220,7 @@ class Env < EnvSettings::Base
       }
 
   # 4. Секреты: Vault (read-only)
-  env :api_secret,
+  var :api_secret,
       type: :string,
       reader: ->(key, setting) {
         Vault.logical.read("secret/#{key}")&.data&.dig(:data, :value)
@@ -228,6 +233,7 @@ end
 **Задача:** Локальные настройки в YAML файле для разработки.
 
 ```ruby
+
 class Env < EnvSettings::Base
   SETTINGS_FILE = Rails.root.join("config/local_settings.yml")
 
@@ -245,8 +251,8 @@ class Env < EnvSettings::Base
     File.write(SETTINGS_FILE, data.to_yaml)
   }
 
-  env :debug_mode, type: :boolean, default: false
-  env :mock_external_api, type: :boolean, default: false
+  var :debug_mode, type: :boolean, default: false
+  var :mock_external_api, type: :boolean, default: false
 end
 
 # config/local_settings.yml
@@ -254,7 +260,7 @@ end
 # MOCK_EXTERNAL_API: "true"
 
 # В коде
-Env.debug_mode = true  # Записывается в YAML
+Env.debug_mode = true # Записывается в YAML
 ```
 
 ## Приоритеты чтения
@@ -267,11 +273,12 @@ Env.debug_mode = true  # Записывается в YAML
 4. **Default** (если значение nil)
 
 ```ruby
+
 class Env < EnvSettings::Base
   default_reader ->(key, setting) { Setting.get(key) }
 
-  env :var1, default: "default1"
-  env :var2, default: "default2", reader: ->(k, s) { "custom" }
+  var :var1, default: "default1"
+  var :var2, default: "default2", reader: ->(k, s) { "custom" }
 end
 
 # Var1: Setting.get("VAR1") → default1
@@ -310,10 +317,10 @@ end
 
 ```ruby
 # ✅ Хорошо - понятно что это read-only
-env :database_url, type: :string, validates: { presence: true }
+var :database_url, type: :string, validates: { presence: true }
 
 # ❌ Плохо - неочевидно
-env :database_url, type: :string, writer: nil
+var :database_url, type: :string, writer: nil
 ```
 
 ### 2. Используйте глобальные колбеки для однотипных переменных
@@ -324,17 +331,17 @@ class Env < EnvSettings::Base
   default_reader ->(key, s) { Setting.get(key) || ENV[key] }
   default_writer ->(key, value, s) { Setting.set(key, value) }
 
-  env :var1, type: :string
-  env :var2, type: :integer
+  var :var1, type: :string
+  var :var2, type: :integer
 end
 
 # ❌ Плохо - дублирование
 class Env < EnvSettings::Base
-  env :var1,
+  var :var1,
       reader: ->(k, s) { Setting.get(k) || ENV[k] },
       writer: ->(k, v, s) { Setting.set(k, v) }
 
-  env :var2,
+  var :var2,
       reader: ->(k, s) { Setting.get(k) || ENV[k] },
       writer: ->(k, v, s) { Setting.set(k, v) }
 end
@@ -343,15 +350,16 @@ end
 ### 3. Кешируйте дорогие операции
 
 ```ruby
+
 class Env < EnvSettings::Base
   @vault_cache = {}
 
-  env :secret_key,
+  var :secret_key,
       reader: ->(key, setting) {
         @vault_cache[key] ||= begin
-          secret = Vault.logical.read("secret/#{key}")
-          secret&.data&.dig(:data, :value)
-        end
+                                secret = Vault.logical.read("secret/#{key}")
+                                secret&.data&.dig(:data, :value)
+                              end
       }
 end
 ```
@@ -374,7 +382,7 @@ end
 ### 5. Валидация в колбеках
 
 ```ruby
-env :max_connections,
+var :max_connections,
     type: :integer,
     default: 10,
     writer: ->(key, value, setting) {

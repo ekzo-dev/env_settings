@@ -30,11 +30,13 @@ env_settings/
 ## Key Features Implemented
 
 ### 1. DSL for Defining Environment Variables
+
 ```ruby
+
 class Env < EnvSettings::Base
-  env :app_name, type: :string, default: "MyApp"
-  env :port, type: :integer, default: 3000
-  env :debug, type: :boolean, default: false
+   var :app_name, type: :string, default: "MyApp"
+   var :port, type: :integer, default: 3000
+   var :debug, type: :boolean, default: false
 end
 ```
 
@@ -55,7 +57,7 @@ Supported types:
 - `inclusion: [values]` - validates value is in allowed list
 
 ### 4. Helper Methods
-Each defined env variable gets:
+Each defined var variable gets:
 - Getter: `Env.app_name`
 - Setter: `Env.app_name = "value"`
 - Boolean helper (for boolean types): `Env.debug?`
@@ -71,7 +73,7 @@ Each defined env variable gets:
 
 The Base class uses Ruby's metaprogramming to dynamically create methods:
 
-1. **`env` method**: Main DSL method that:
+1. **`var` method**: Main DSL method that:
    - Stores setting configuration in `@settings` hash
    - Defines getter/setter methods dynamically
    - Creates boolean helper methods for boolean types
@@ -82,7 +84,7 @@ The Base class uses Ruby's metaprogramming to dynamically create methods:
 3. **Validation**: `validate!` method iterates through all settings and applies configured validations
 
 4. **Value Storage**: Values are read from `ENV` hash using uppercase variable names
-   - `env :app_name` maps to `ENV['APP_NAME']`
+   - `var :app_name` maps to `ENV['APP_NAME']`
 
 ## Testing
 
@@ -101,10 +103,10 @@ bundle exec rspec
 ```ruby
 # Define settings
 class Env < EnvSettings::Base
-  env :database_url, validates: { presence: true }
-  env :port, type: :integer, default: 3000
-  env :debug, type: :boolean, default: false
-  env :allowed_hosts, type: :array, default: []
+  var :database_url, validates: { presence: true }
+  var :port, type: :integer, default: 3000
+  var :debug, type: :boolean, default: false
+  var :allowed_hosts, type: :array, default: []
 end
 
 # Use in application
@@ -132,16 +134,18 @@ The library now supports custom reader/writer callbacks, enabling flexible stora
 - Full backward compatibility
 
 **Usage:**
-```ruby
-class Env < EnvSettings::Base
-  # Custom callbacks per variable
-  env :api_key,
-      reader: ->(key, setting) { Setting.get(key) },
-      writer: ->(key, value, setting) { Setting.set(key, value) }
 
-  # Global defaults for all variables
-  default_reader ->(key, setting) { Setting.get(key) || ENV[key] }
-  default_writer ->(key, value, setting) { Setting.set(key, value) }
+```ruby
+
+class Env < EnvSettings::Base
+   # Custom callbacks per variable
+   var :api_key,
+       reader: ->(key, setting) { Setting.get(key) },
+       writer: ->(key, value, setting) { Setting.set(key, value) }
+
+   # Global defaults for all variables
+   default_reader ->(key, setting) { Setting.get(key) || ENV[key] }
+   default_writer ->(key, value, setting) { Setting.set(key, value) }
 end
 ```
 
@@ -156,7 +160,7 @@ end
 Potential enhancements:
 - [ ] Add support for nested environment variables
 - [ ] Add caching mechanism for parsed values
-- [ ] Add support for .env file loading
+- [ ] Add support for .var file loading
 - [ ] Add Rails generator for creating Env class
 - [ ] Add support for environment-specific defaults
 - [ ] Add documentation generation from definitions
@@ -167,8 +171,8 @@ Potential enhancements:
 
 ### Environment Variable Naming
 The gem automatically converts Ruby method names to uppercase ENV variable names:
-- `env :app_name` → `ENV['APP_NAME']`
-- `env :database_url` → `ENV['DATABASE_URL']`
+- `var :app_name` → `ENV['APP_NAME']`
+- `var :database_url` → `ENV['DATABASE_URL']`
 
 ### Type Safety
 The gem ensures type safety by:
@@ -191,7 +195,7 @@ The gem uses Ruby's metaprogramming capabilities:
 - env_settings is lighter weight and cloud-native friendly
 
 ### vs dotenv
-- **dotenv**: Loads .env files into ENV
+- **dotenv**: Loads .var files into ENV
 - **env_settings**: Provides type-safe access layer on top of ENV
 - Can be used together: dotenv loads, env_settings provides typed access
 

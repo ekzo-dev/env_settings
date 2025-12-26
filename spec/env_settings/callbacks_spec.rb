@@ -13,12 +13,12 @@ RSpec.describe EnvSettings::Base, "callbacks" do
     let(:test_class) do
       test_storage = storage
       Class.new(EnvSettings::Base) do
-        env :api_key,
+        var :api_key,
             type: :string,
             default: "default_key",
             reader: ->(key, setting) { test_storage[key] }
 
-        env :timeout,
+        var :timeout,
             type: :integer,
             default: 30,
             reader: ->(key, setting) { test_storage[key] }
@@ -53,13 +53,13 @@ RSpec.describe EnvSettings::Base, "callbacks" do
     let(:test_class) do
       test_storage = storage
       Class.new(EnvSettings::Base) do
-        env :api_key,
+        var :api_key,
             type: :string,
             default: "default_key",
             reader: ->(key, setting) { test_storage[key] },
             writer: ->(key, value, setting) { test_storage[key] = value }
 
-        env :feature_flag,
+        var :feature_flag,
             type: :boolean,
             default: false,
             reader: ->(key, setting) { test_storage[key] },
@@ -91,9 +91,9 @@ RSpec.describe EnvSettings::Base, "callbacks" do
   describe "read-only variables (no writer)" do
     let(:test_class) do
       Class.new(EnvSettings::Base) do
-        env :database_url, type: :string, default: "default_db"
+        var :database_url, type: :string, default: "default_db"
 
-        env :api_endpoint,
+        var :api_endpoint,
             type: :string,
             reader: ->(key, setting) { "https://api.example.com" }
       end
@@ -123,11 +123,11 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         # Set default reader for all variables
         default_reader ->(key, setting) { test_storage[key] || ENV[key] }
 
-        env :api_key, type: :string, default: "default_key"
-        env :timeout, type: :integer, default: 30
+        var :api_key, type: :string, default: "default_key"
+        var :timeout, type: :integer, default: 30
 
         # This one overrides the default reader
-        env :special_key,
+        var :special_key,
             type: :string,
             reader: ->(key, setting) { "always_special" }
       end
@@ -148,7 +148,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
       expect(test_class.timeout).to eq(60)
     end
 
-    it "allows individual env to override default_reader" do
+    it "allows individual var to override default_reader" do
       storage["SPECIAL_KEY"] = "from_storage"
       expect(test_class.special_key).to eq("always_special")
     end
@@ -164,11 +164,11 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         default_reader ->(key, setting) { test_storage[key] }
         default_writer ->(key, value, setting) { test_storage[key] = value }
 
-        env :api_key, type: :string, default: "default_key"
-        env :timeout, type: :integer, default: 30
+        var :api_key, type: :string, default: "default_key"
+        var :timeout, type: :integer, default: 30
 
         # This one overrides the default writer
-        env :special_key,
+        var :special_key,
             type: :string,
             writer: ->(key, value, setting) { test_storage["CUSTOM_#{key}"] = value }
       end
@@ -179,7 +179,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
       expect(storage["API_KEY"]).to eq("new_value")
     end
 
-    it "allows individual env to override default_writer" do
+    it "allows individual var to override default_writer" do
       test_class.special_key = "special_value"
       expect(storage["CUSTOM_SPECIAL_KEY"]).to eq("special_value")
       expect(storage["SPECIAL_KEY"]).to be_nil
@@ -201,7 +201,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
           test_storage[key]
         end
 
-        env :api_key, type: :string, default: "default_key"
+        var :api_key, type: :string, default: "default_key"
       end
     end
 
@@ -220,7 +220,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         default_reader { |key, setting| test_storage[key] }
         default_writer { |key, value, setting| test_storage[key] = value }
 
-        env :api_key, type: :string, default: "default_key"
+        var :api_key, type: :string, default: "default_key"
       end
     end
 
@@ -236,7 +236,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
     let(:test_class) do
       captured = captured_settings
       Class.new(EnvSettings::Base) do
-        env :api_key,
+        var :api_key,
             type: :string,
             default: "default_key",
             validates: { presence: true },
@@ -268,15 +268,15 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         default_reader ->(key, setting) { test_storage[key] || ENV[key] }
 
         # Read-only from storage
-        env :database_url, type: :string, default: "default_db"
+        var :database_url, type: :string, default: "default_db"
 
         # Writable to storage
-        env :api_key,
+        var :api_key,
             type: :string,
             writer: ->(key, value, setting) { test_storage[key] = value }
 
         # Completely custom
-        env :feature_flag,
+        var :feature_flag,
             type: :boolean,
             reader: ->(key, setting) { test_storage["custom_#{key}"] },
             writer: ->(key, value, setting) { test_storage["custom_#{key}"] = value }
@@ -310,8 +310,8 @@ RSpec.describe EnvSettings::Base, "callbacks" do
   describe "backward compatibility" do
     let(:test_class) do
       Class.new(EnvSettings::Base) do
-        env :app_name, type: :string, default: "TestApp"
-        env :port, type: :integer, default: 3000
+        var :app_name, type: :string, default: "TestApp"
+        var :port, type: :integer, default: 3000
       end
     end
 

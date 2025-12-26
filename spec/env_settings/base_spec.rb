@@ -5,12 +5,12 @@ require "spec_helper"
 RSpec.describe EnvSettings::Base do
   let(:test_class) do
     Class.new(EnvSettings::Base) do
-      env :app_name, type: :string, default: "TestApp"
-      env :port, type: :integer, default: 3000
-      env :debug, type: :boolean, default: false
-      env :database_url, validates: { presence: true }
-      env :api_keys, type: :array, default: []
-      env :config, type: :hash, default: {}
+      var :app_name, type: :string, default: "TestApp"
+      var :port, type: :integer, default: 3000
+      var :debug, type: :boolean, default: false
+      var :database_url, validates: { presence: true }
+      var :api_keys, type: :array, default: []
+      var :config, type: :hash, default: {}
     end
   end
 
@@ -18,7 +18,7 @@ RSpec.describe EnvSettings::Base do
     ENV.clear
   end
 
-  describe ".env" do
+  describe ".var" do
     it "defines getter method" do
       expect(test_class).to respond_to(:app_name)
     end
@@ -137,12 +137,12 @@ RSpec.describe EnvSettings::Base do
     context "with custom writer" do
       let(:writable_class) do
         Class.new(EnvSettings::Base) do
-          env :app_name,
+          var :app_name,
               type: :string,
               default: "TestApp",
               writer: ->(key, value, setting) { ENV[key] = value.to_s }
 
-          env :port,
+          var :port,
               type: :integer,
               default: 3000,
               writer: ->(key, value, setting) { ENV[key] = value.to_s }
@@ -179,7 +179,7 @@ RSpec.describe EnvSettings::Base do
     context "length validation" do
       let(:test_class_with_length) do
         Class.new(EnvSettings::Base) do
-          env :username, validates: { length: { minimum: 3, maximum: 20 } }
+          var :username, validates: { length: { minimum: 3, maximum: 20 } }
         end
       end
 
@@ -208,7 +208,7 @@ RSpec.describe EnvSettings::Base do
     context "format validation" do
       let(:test_class_with_format) do
         Class.new(EnvSettings::Base) do
-          env :email, validates: { format: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i }
+          var :email, validates: { format: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i }
         end
       end
 
@@ -229,7 +229,7 @@ RSpec.describe EnvSettings::Base do
     context "inclusion validation" do
       let(:test_class_with_inclusion) do
         Class.new(EnvSettings::Base) do
-          env :environment, validates: { inclusion: %w[development test production] }
+          var :environment, validates: { inclusion: %w[development test production] }
         end
       end
 

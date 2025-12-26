@@ -41,13 +41,14 @@ gem install env_settings
 Create a class that inherits from `EnvSettings::Base` and define your environment variables:
 
 ```ruby
+
 class Env < EnvSettings::Base
-  env :app_name, type: :string, default: "MyApp"
-  env :port, type: :integer, default: 3000
-  env :debug, type: :boolean, default: false
-  env :database_url, type: :string, validates: { presence: true }
-  env :allowed_hosts, type: :array, default: []
-  env :redis_config, type: :hash, default: {}
+  var :app_name, type: :string, default: "MyApp"
+  var :port, type: :integer, default: 3000
+  var :debug, type: :boolean, default: false
+  var :database_url, type: :string, validates: { presence: true }
+  var :allowed_hosts, type: :array, default: []
+  var :redis_config, type: :hash, default: {}
 end
 ```
 
@@ -77,42 +78,46 @@ Env.to_h              # Same as .all
 
 ```ruby
 # This will raise ReadOnlyError
-Env.app_name = "NewApp"  # ❌ EnvSettings::ReadOnlyError
+Env.app_name = "NewApp" # ❌ EnvSettings::ReadOnlyError
 
 # To make a variable writable, provide a writer callback
 class Env < EnvSettings::Base
-  env :app_name,
+  var :app_name,
       type: :string,
       default: "MyApp",
       writer: ->(key, value, setting) { ENV[key] = value.to_s }
 end
 
-Env.app_name = "NewApp"  # ✅ Works
+Env.app_name = "NewApp" # ✅ Works
 ```
 
 ### Supported Types
 
 #### String (default)
+
 ```ruby
-env :app_name, type: :string, default: "MyApp"
+var :app_name, type: :string, default: "MyApp"
 # ENV["APP_NAME"] = "MyApp" => "MyApp"
 ```
 
 #### Integer
+
 ```ruby
-env :port, type: :integer, default: 3000
+var :port, type: :integer, default: 3000
 # ENV["PORT"] = "5000" => 5000
 ```
 
 #### Float
+
 ```ruby
-env :price, type: :float, default: 9.99
+var :price, type: :float, default: 9.99
 # ENV["PRICE"] = "19.99" => 19.99
 ```
 
 #### Boolean
+
 ```ruby
-env :debug, type: :boolean, default: false
+var :debug, type: :boolean, default: false
 # ENV["DEBUG"] = "true"  => true
 # ENV["DEBUG"] = "1"     => true
 # ENV["DEBUG"] = "yes"   => true
@@ -121,12 +126,13 @@ env :debug, type: :boolean, default: false
 # ENV["DEBUG"] = "0"     => false
 
 # Boolean helper method
-Env.debug?  # => true/false
+Env.debug? # => true/false
 ```
 
 #### Array
+
 ```ruby
-env :allowed_hosts, type: :array, default: []
+var :allowed_hosts, type: :array, default: []
 
 # JSON format
 # ENV["ALLOWED_HOSTS"] = '["host1", "host2"]' => ["host1", "host2"]
@@ -136,8 +142,9 @@ env :allowed_hosts, type: :array, default: []
 ```
 
 #### Hash
+
 ```ruby
-env :redis_config, type: :hash, default: {}
+var :redis_config, type: :hash, default: {}
 
 # JSON format
 # ENV["REDIS_CONFIG"] = '{"host": "localhost", "port": 6379}'
@@ -145,21 +152,24 @@ env :redis_config, type: :hash, default: {}
 ```
 
 #### Symbol
+
 ```ruby
-env :log_level, type: :symbol, default: :info
+var :log_level, type: :symbol, default: :info
 # ENV["LOG_LEVEL"] = "debug" => :debug
 ```
 
 ### Validations
 
 #### Presence
+
 ```ruby
-env :database_url, validates: { presence: true }
+var :database_url, validates: { presence: true }
 ```
 
 #### Length
+
 ```ruby
-env :username, validates: {
+var :username, validates: {
   length: {
     minimum: 3,
     maximum: 20
@@ -167,28 +177,31 @@ env :username, validates: {
 }
 
 # Or with range
-env :username, validates: {
+var :username, validates: {
   length: { in: 3..20 }
 }
 ```
 
 #### Format (Regex)
+
 ```ruby
-env :email, validates: {
+var :email, validates: {
   format: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i
 }
 ```
 
 #### Inclusion
+
 ```ruby
-env :environment, validates: {
+var :environment, validates: {
   inclusion: %w[development test production]
 }
 ```
 
 #### Multiple Validations
+
 ```ruby
-env :api_key, validates: {
+var :api_key, validates: {
   presence: true,
   length: { minimum: 32 },
   format: /\A[a-zA-Z0-9]+\z/
@@ -216,17 +229,17 @@ Env.validate!
 Create an initializer:
 
 ```ruby
-# config/initializers/env.rb
+# config/initializers/var.rb
 class Env < EnvSettings::Base
-  env :app_name, type: :string, default: "MyRailsApp"
-  env :port, type: :integer, default: 3000
-  env :database_url, type: :string, validates: { presence: true }
-  env :redis_url, type: :string, default: "redis://localhost:6379/0"
-  env :smtp_host, type: :string
-  env :smtp_port, type: :integer, default: 587
-  env :enable_cache, type: :boolean, default: false
-  env :allowed_hosts, type: :array, default: []
-  env :environment, type: :string, validates: {
+  var :app_name, type: :string, default: "MyRailsApp"
+  var :port, type: :integer, default: 3000
+  var :database_url, type: :string, validates: { presence: true }
+  var :redis_url, type: :string, default: "redis://localhost:6379/0"
+  var :smtp_host, type: :string
+  var :smtp_port, type: :integer, default: 587
+  var :enable_cache, type: :boolean, default: false
+  var :allowed_hosts, type: :array, default: []
+  var :environment, type: :string, validates: {
     inclusion: %w[development test staging production]
   }
 end
@@ -258,18 +271,19 @@ EnvSettings allows you to define custom callbacks for reading and writing variab
 ### Individual Variable Callbacks
 
 ```ruby
+
 class Env < EnvSettings::Base
   # Read-only from ENV (default behavior)
-  env :database_url, type: :string, validates: { presence: true }
+  var :database_url, type: :string, validates: { presence: true }
 
   # Custom reader from database
-  env :maintenance_mode,
+  var :maintenance_mode,
       type: :boolean,
       default: false,
       reader: ->(key, setting) { Setting.find_by(key: key)&.value }
 
   # Custom reader and writer
-  env :feature_flags,
+  var :feature_flags,
       type: :hash,
       default: {},
       reader: ->(key, setting) {
@@ -282,9 +296,9 @@ class Env < EnvSettings::Base
 end
 
 # Usage
-Env.maintenance_mode           # Reads from database
+Env.maintenance_mode # Reads from database
 Env.feature_flags = { x: true } # Writes to Redis
-Env.database_url = "new"       # ❌ ReadOnlyError (no writer)
+Env.database_url = "new" # ❌ ReadOnlyError (no writer)
 ```
 
 ### Global Default Callbacks
@@ -292,6 +306,7 @@ Env.database_url = "new"       # ❌ ReadOnlyError (no writer)
 Set default reader/writer for all variables:
 
 ```ruby
+
 class Env < EnvSettings::Base
   # All variables will use these callbacks by default
   default_reader ->(key, setting) {
@@ -303,14 +318,14 @@ class Env < EnvSettings::Base
   }
 
   # Now all variables are readable/writable through database
-  env :api_key, type: :string, default: "default_key"
-  env :timeout, type: :integer, default: 30
+  var :api_key, type: :string, default: "default_key"
+  var :timeout, type: :integer, default: 30
 
   # Can override for specific variables
-  env :secret_key,
+  var :secret_key,
       type: :string,
-      reader: ->(key, setting) { ENV[key] },  # Only from ENV
-      writer: nil                              # Explicitly read-only
+      reader: ->(key, setting) { ENV[key] }, # Only from ENV
+      writer: nil # Explicitly read-only
 end
 
 # Block syntax is also supported
@@ -353,6 +368,7 @@ writer: ->(key, value, setting) {
 #### ActiveRecord Storage
 
 ```ruby
+
 class Env < EnvSettings::Base
   default_reader ->(key, setting) {
     Setting.find_by(key: key)&.value || ENV[key]
@@ -362,14 +378,15 @@ class Env < EnvSettings::Base
     Setting.find_or_create_by(key: key).update!(value: value)
   }
 
-  env :maintenance_mode, type: :boolean, default: false
-  env :max_connections, type: :integer, default: 10
+  var :maintenance_mode, type: :boolean, default: false
+  var :max_connections, type: :integer, default: 10
 end
 ```
 
 #### Redis Storage
 
 ```ruby
+
 class Env < EnvSettings::Base
   default_reader ->(key, setting) {
     Redis.current.get("app:settings:#{key}")
@@ -379,14 +396,15 @@ class Env < EnvSettings::Base
     Redis.current.set("app:settings:#{key}", value.to_s)
   }
 
-  env :rate_limit, type: :integer, default: 100
-  env :feature_x_enabled, type: :boolean, default: false
+  var :rate_limit, type: :integer, default: 100
+  var :feature_x_enabled, type: :boolean, default: false
 end
 ```
 
 #### YAML File Storage
 
 ```ruby
+
 class Env < EnvSettings::Base
   SETTINGS_FILE = "config/runtime_settings.yml"
 
@@ -401,15 +419,16 @@ class Env < EnvSettings::Base
     File.write(SETTINGS_FILE, data.to_yaml)
   }
 
-  env :log_level, type: :symbol, default: :info
+  var :log_level, type: :symbol, default: :info
 end
 ```
 
 #### Vault/Secrets Manager
 
 ```ruby
+
 class Env < EnvSettings::Base
-  env :api_key,
+  var :api_key,
       type: :string,
       reader: ->(key, setting) {
         Vault.logical.read("secret/data/#{key}")&.data&.dig(:data, :value)
@@ -423,29 +442,30 @@ end
 #### Mixed Strategy
 
 ```ruby
+
 class Env < EnvSettings::Base
   # Default: read from ENV (no writer = read-only)
-  env :database_url, type: :string, validates: { presence: true }
+  var :database_url, type: :string, validates: { presence: true }
 
   # Runtime settings in database
-  env :maintenance_mode,
+  var :maintenance_mode,
       type: :boolean,
       default: false,
       reader: ->(key, setting) { Setting.get(key) },
       writer: ->(key, value, setting) { Setting.set(key, value) }
 
   # Feature flags in Redis
-  env :feature_flags,
+  var :feature_flags,
       type: :hash,
       default: {},
       reader: ->(key, setting) { JSON.parse(Redis.current.get(key) || "{}") },
       writer: ->(key, value, setting) { Redis.current.set(key, value.to_json) }
 
   # Secrets in Vault
-  env :stripe_secret_key,
+  var :stripe_secret_key,
       type: :string,
       reader: ->(key, setting) { Vault.read("secret/#{key}") }
-      # No writer = read-only
+  # No writer = read-only
 end
 ```
 
@@ -472,12 +492,14 @@ ALLOWED_HOSTS = ENV.fetch('ALLOWED_HOSTS', '').split(',').map(&:strip)
 ```
 
 **After:**
+
 ```ruby
+
 class Env < EnvSettings::Base
-  env :database_url, validates: { presence: true }
-  env :port, type: :integer, default: 3000
-  env :debug, type: :boolean, default: false
-  env :allowed_hosts, type: :array, default: []
+  var :database_url, validates: { presence: true }
+  var :port, type: :integer, default: 3000
+  var :debug, type: :boolean, default: false
+  var :allowed_hosts, type: :array, default: []
 end
 
 Env.database_url

@@ -7,7 +7,7 @@ module EnvSettings
 
   class Base
     class << self
-      def env(name, type: :string, default: nil, validates: nil, reader: nil, writer: nil)
+      def var(name, type: :string, default: nil, validates: nil, reader: nil, writer: nil)
         env_key = name.to_s.upcase
 
         settings[name] = {
