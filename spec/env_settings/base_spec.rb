@@ -140,12 +140,12 @@ RSpec.describe EnvSettings::Base do
           var :app_name,
               type: :string,
               default: "TestApp",
-              writer: ->(key, value, setting) { ENV[key] = value.to_s }
+              writer: ->(value, setting) { ENV[setting[:env_key]] = value.to_s }
 
           var :port,
               type: :integer,
               default: 3000,
-              writer: ->(key, value, setting) { ENV[key] = value.to_s }
+              writer: ->(value, setting) { ENV[setting[:env_key]] = value.to_s }
         end
       end
 

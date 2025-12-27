@@ -71,7 +71,7 @@ module EnvSettings
           include ActiveModel::Validations if defined?(ActiveModel::Validations)
           include ActiveModel::Model if defined?(ActiveModel::Model)
 
-          # Определяем методы для чтения значений
+          # Define methods for reading values
           parent_class.settings.keys.each do |key|
             define_method(key) do
               # Check if value is set on instance, otherwise read from parent
@@ -88,7 +88,7 @@ module EnvSettings
             end
           end
 
-          # Метод для обновления определений атрибутов при добавлении новых var
+          # Method to add new vars
           def self.add_attribute(name, parent_class)
             define_method(name) do
               ivar = "@#{name}"
@@ -104,7 +104,7 @@ module EnvSettings
             end
           end
 
-          # Для ActiveModel error messages
+          # For ActiveModel error messages
           def self.model_name
             ActiveModel::Name.new(self, nil, "EnvSettings")
           end
@@ -133,9 +133,9 @@ module EnvSettings
 
         # Use custom reader if provided
         if setting[:reader]
-          raw_value = setting[:reader].call(setting[:env_key], setting)
+          raw_value = setting[:reader].call(setting)
         elsif get_default_reader
-          raw_value = get_default_reader.call(setting[:env_key], setting)
+          raw_value = get_default_reader.call(setting)
         else
           # Default behavior: read from ENV
           raw_value = ENV[setting[:env_key]]
@@ -157,9 +157,9 @@ module EnvSettings
 
         # Use custom writer if provided
         if setting[:writer]
-          setting[:writer].call(setting[:env_key], value, setting)
+          setting[:writer].call(value, setting)
         elsif get_default_writer
-          get_default_writer.call(setting[:env_key], value, setting)
+          get_default_writer.call(value, setting)
         else
           # Default behavior: raise error (read-only)
           raise ReadOnlyError, "Cannot write to '#{name}': variable is read-only. Provide a writer callback to enable writing."

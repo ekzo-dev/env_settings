@@ -16,12 +16,12 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         var :api_key,
             type: :string,
             default: "default_key",
-            reader: ->(key, setting) { test_storage[key] }
+            reader: ->(setting) { test_storage[setting[:env_key]] }
 
         var :timeout,
             type: :integer,
             default: 30,
-            reader: ->(key, setting) { test_storage[key] }
+            reader: ->(setting) { test_storage[setting[:env_key]] }
       end
     end
 
@@ -56,14 +56,14 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         var :api_key,
             type: :string,
             default: "default_key",
-            reader: ->(key, setting) { test_storage[key] },
-            writer: ->(key, value, setting) { test_storage[key] = value }
+            reader: ->(setting) { test_storage[setting[:env_key]] },
+            writer: ->(value, setting) { test_storage[setting[:env_key]] = value }
 
         var :feature_flag,
             type: :boolean,
             default: false,
-            reader: ->(key, setting) { test_storage[key] },
-            writer: ->(key, value, setting) { test_storage[key] = value }
+            reader: ->(setting) { test_storage[setting[:env_key]] },
+            writer: ->(value, setting) { test_storage[setting[:env_key]] = value }
       end
     end
 
@@ -95,7 +95,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
 
         var :api_endpoint,
             type: :string,
-            reader: ->(key, setting) { "https://api.example.com" }
+            reader: ->(setting) { "https://api.example.com" }
       end
     end
 
@@ -121,7 +121,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
       test_storage = storage
       Class.new(EnvSettings::Base) do
         # Set default reader for all variables
-        default_reader ->(key, setting) { test_storage[key] || ENV[key] }
+        default_reader ->(setting) { test_storage[setting[:env_key]] || ENV[setting[:env_key]] }
 
         var :api_key, type: :string, default: "default_key"
         var :timeout, type: :integer, default: 30
@@ -129,7 +129,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         # This one overrides the default reader
         var :special_key,
             type: :string,
-            reader: ->(key, setting) { "always_special" }
+            reader: ->(setting) { "always_special" }
       end
     end
 
@@ -161,8 +161,8 @@ RSpec.describe EnvSettings::Base, "callbacks" do
       test_storage = storage
       Class.new(EnvSettings::Base) do
         # Set default writer for all variables
-        default_reader ->(key, setting) { test_storage[key] }
-        default_writer ->(key, value, setting) { test_storage[key] = value }
+        default_reader ->(setting) { test_storage[setting[:env_key]] }
+        default_writer ->(value, setting) { test_storage[setting[:env_key]] = value }
 
         var :api_key, type: :string, default: "default_key"
         var :timeout, type: :integer, default: 30
@@ -170,7 +170,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         # This one overrides the default writer
         var :special_key,
             type: :string,
-            writer: ->(key, value, setting) { test_storage["CUSTOM_#{key}"] = value }
+            writer: ->(value, setting) { test_storage["CUSTOM_#{setting[:env_key]}"] = value }
       end
     end
 
@@ -197,8 +197,8 @@ RSpec.describe EnvSettings::Base, "callbacks" do
     let(:test_class) do
       test_storage = storage
       Class.new(EnvSettings::Base) do
-        default_reader do |key, setting|
-          test_storage[key]
+        default_reader do |setting|
+          test_storage[setting[:env_key]]
         end
 
         var :api_key, type: :string, default: "default_key"
@@ -217,8 +217,8 @@ RSpec.describe EnvSettings::Base, "callbacks" do
     let(:test_class) do
       test_storage = storage
       Class.new(EnvSettings::Base) do
-        default_reader { |key, setting| test_storage[key] }
-        default_writer { |key, value, setting| test_storage[key] = value }
+        default_reader { |setting| test_storage[setting[:env_key]] }
+        default_writer { |value, setting| test_storage[setting[:env_key]] = value }
 
         var :api_key, type: :string, default: "default_key"
       end
@@ -240,7 +240,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
             type: :string,
             default: "default_key",
             validates: { presence: true },
-            reader: ->(key, setting) {
+            reader: ->(setting) {
               captured << setting
               "test_value"
             }
@@ -265,7 +265,7 @@ RSpec.describe EnvSettings::Base, "callbacks" do
       test_storage = storage
       Class.new(EnvSettings::Base) do
         # Default reader but no default writer
-        default_reader ->(key, setting) { test_storage[key] || ENV[key] }
+        default_reader ->(setting) { test_storage[setting[:env_key]] || ENV[setting[:env_key]] }
 
         # Read-only from storage
         var :database_url, type: :string, default: "default_db"
@@ -273,13 +273,13 @@ RSpec.describe EnvSettings::Base, "callbacks" do
         # Writable to storage
         var :api_key,
             type: :string,
-            writer: ->(key, value, setting) { test_storage[key] = value }
+            writer: ->(value, setting) { test_storage[setting[:env_key]] = value }
 
         # Completely custom
         var :feature_flag,
             type: :boolean,
-            reader: ->(key, setting) { test_storage["custom_#{key}"] },
-            writer: ->(key, value, setting) { test_storage["custom_#{key}"] = value }
+            reader: ->(setting) { test_storage["custom_#{setting[:env_key]}"] },
+            writer: ->(value, setting) { test_storage["custom_#{setting[:env_key]}"] = value }
       end
     end
 

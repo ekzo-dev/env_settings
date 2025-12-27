@@ -1,3 +1,4 @@
+/.idea
 /.bundle/
 /.yardoc
 /_yardoc/
@@ -10,4 +11,4 @@
 # rspec failure tracking
 .rspec_status
 
-.idea
+/DEVELOPMENT.md

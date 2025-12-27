@@ -86,7 +86,7 @@ class Env < EnvSettings::Base
   var :app_name,
       type: :string,
       default: "MyApp",
-      writer: ->(key, value, setting) { ENV[key] = value.to_s }
+      writer: ->(value, setting) { ENV[setting[:env_key]] = value.to_s }
 end
 
 Env.app_name = "NewApp" # Works
@@ -239,7 +239,7 @@ When you assign a value to a variable with validations, it's automatically valid
 
 ```ruby
 class Env < EnvSettings::Base
-  default_writer ->(key, value, setting) { Setting.find_or_create_by(key: key).update!(value: value) }
+  default_writer ->(value, setting) { Setting.find_or_create_by(key: key).update!(value: value) }
 
   var :username,
       type: :string,
@@ -410,18 +410,18 @@ class Env < EnvSettings::Base
   var :maintenance_mode,
       type: :boolean,
       default: false,
-      reader: ->(key, setting) { Setting.find_by(key: key)&.value }
+      reader: ->(setting) { Setting.find_by(key: setting[:env_key])&.value }
 
   # Custom reader and writer
   var :feature_flags,
       type: :hash,
       default: {},
-      reader: ->(key, setting) {
-        value = Redis.current.get("settings:#{key}")
+      reader: ->(setting) {
+        value = Redis.current.get("settings:#{setting[:env_key]}")
         value ? JSON.parse(value) : nil
       },
-      writer: ->(key, value, setting) {
-        Redis.current.set("settings:#{key}", value.to_json)
+      writer: ->(value, setting) {
+        Redis.current.set("settings:#{setting[:env_key]}", value.to_json)
       }
 end
 
@@ -439,12 +439,12 @@ Set default reader/writer for all variables:
 
 class Env < EnvSettings::Base
   # All variables will use these callbacks by default
-  default_reader ->(key, setting) {
-    Setting.find_by(key: key)&.value || ENV[key]
+  default_reader ->(setting) {
+    Setting.find_by(key: setting[:env_key])&.value || ENV[setting[:env_key]]
   }
 
-  default_writer ->(key, value, setting) {
-    Setting.find_or_create_by(key: key).update!(value: value)
+  default_writer ->(value, setting) {
+    Setting.find_or_create_by(key: setting[:env_key]).update!(value: value)
   }
 
   # Now all variables are readable/writable through database
@@ -454,18 +454,18 @@ class Env < EnvSettings::Base
   # Can override for specific variables
   var :secret_key,
       type: :string,
-      reader: ->(key, setting) { ENV[key] }, # Only from ENV
+      reader: ->(setting) { ENV[setting[:env_key]] }, # Only from ENV
       writer: nil # Explicitly read-only
 end
 
 # Block syntax is also supported
 class Env < EnvSettings::Base
-  default_reader do |key, setting|
-    Setting.find_by(key: key)&.value || ENV[key]
+  default_reader do |setting|
+    Setting.find_by(key: setting[:env_key])&.value || ENV[setting[:env_key]]
   end
 
-  default_writer do |key, value, setting|
-    Setting.find_or_create_by(key: key).update!(value: value)
+  default_writer do |value, setting|
+    Setting.find_or_create_by(key: setting[:env_key]).update!(value: value)
   end
 end
 ```
@@ -479,7 +479,7 @@ Callbacks receive the following parameters:
 
 **Reader callback:**
 ```ruby
-reader: ->(key, setting) {
+reader: ->(setting) {
   # Must return raw value (string/nil)
   # Type coercion is applied automatically
 }
@@ -487,7 +487,7 @@ reader: ->(key, setting) {
 
 **Writer callback:**
 ```ruby
-writer: ->(key, value, setting) {
+writer: ->(value, setting) {
   # Receives the value to write
   # No return value expected
 }
@@ -500,12 +500,12 @@ writer: ->(key, value, setting) {
 ```ruby
 
 class Env < EnvSettings::Base
-  default_reader ->(key, setting) {
-    Setting.find_by(key: key)&.value || ENV[key]
+  default_reader ->(setting) {
+    Setting.find_by(key: setting[:env_key])&.value || ENV[setting[:env_key]]
   }
 
-  default_writer ->(key, value, setting) {
-    Setting.find_or_create_by(key: key).update!(value: value)
+  default_writer ->(value, setting) {
+    Setting.find_or_create_by(key: setting[:env_key]).update!(value: value)
   }
 
   var :maintenance_mode, type: :boolean, default: false
@@ -518,12 +518,12 @@ end
 ```ruby
 
 class Env < EnvSettings::Base
-  default_reader ->(key, setting) {
-    Redis.current.get("app:settings:#{key}")
+  default_reader ->(setting) {
+    Redis.current.get("app:settings:#{setting[:env_key]}")
   }
 
-  default_writer ->(key, value, setting) {
-    Redis.current.set("app:settings:#{key}", value.to_s)
+  default_writer ->(value, setting) {
+    Redis.current.set("app:settings:#{setting[:env_key]}", value.to_s)
   }
 
   var :rate_limit, type: :integer, default: 100
@@ -538,14 +538,14 @@ end
 class Env < EnvSettings::Base
   SETTINGS_FILE = "config/runtime_settings.yml"
 
-  default_reader ->(key, setting) {
-    return ENV[key] unless File.exist?(SETTINGS_FILE)
-    YAML.load_file(SETTINGS_FILE)[key]
+  default_reader ->(setting) {
+    return ENV[setting[:env_key]] unless File.exist?(SETTINGS_FILE)
+    YAML.load_file(SETTINGS_FILE)[setting[:env_key]]
   }
 
-  default_writer ->(key, value, setting) {
+  default_writer ->(value, setting) {
     data = File.exist?(SETTINGS_FILE) ? YAML.load_file(SETTINGS_FILE) : {}
-    data[key] = value.to_s
+    data[setting[:env_key]] = value.to_s
     File.write(SETTINGS_FILE, data.to_yaml)
   }
 
@@ -560,11 +560,11 @@ end
 class Env < EnvSettings::Base
   var :api_key,
       type: :string,
-      reader: ->(key, setting) {
-        Vault.logical.read("secret/data/#{key}")&.data&.dig(:data, :value)
+      reader: ->(setting) {
+        Vault.logical.read("secret/data/#{setting[:env_key]}")&.data&.dig(:data, :value)
       },
-      writer: ->(key, value, setting) {
-        Vault.logical.write("secret/data/#{key}", data: { value: value })
+      writer: ->(value, setting) {
+        Vault.logical.write("secret/data/#{setting[:env_key]}", data: { value: value })
       }
 end
 ```
@@ -581,20 +581,20 @@ class Env < EnvSettings::Base
   var :maintenance_mode,
       type: :boolean,
       default: false,
-      reader: ->(key, setting) { Setting.get(key) },
-      writer: ->(key, value, setting) { Setting.set(key, value) }
+      reader: ->(setting) { Setting.get(setting[:env_key]) },
+      writer: ->(value, setting) { Setting.set(setting[:env_key], value) }
 
   # Feature flags in Redis
   var :feature_flags,
       type: :hash,
       default: {},
-      reader: ->(key, setting) { JSON.parse(Redis.current.get(key) || "{}") },
-      writer: ->(key, value, setting) { Redis.current.set(key, value.to_json) }
+      reader: ->(setting) { JSON.parse(Redis.current.get(setting[:env_key]) || "{}") },
+      writer: ->(value, setting) { Redis.current.set(setting[:env_key], value.to_json) }
 
   # Secrets in Vault
   var :stripe_secret_key,
       type: :string,
-      reader: ->(key, setting) { Vault.read("secret/#{key}") }
+      reader: ->(setting) { Vault.read("secret/#{setting[:env_key]}") }
   # No writer = read-only
 end
 ```
@@ -621,8 +621,8 @@ end
 
 # EnvSettings configuration
 class Env < EnvSettings::Base
-  default_reader ->(key, setting) { Setting.get(key) || ENV[key] }
-  default_writer ->(key, value, setting) { Setting.set(key, value) }
+  default_reader ->(setting) { Setting.get(setting[:env_key]) || ENV[setting[:env_key]] }
+  default_writer ->(value, setting) { Setting.set(setting[:env_key], value) }
 
   var :maintenance_mode, type: :boolean, default: false
   var :max_upload_size, type: :integer, default: 10_485_760
@@ -647,12 +647,12 @@ class Env < EnvSettings::Base
   var :feature_flags,
       type: :hash,
       default: {},
-      reader: ->(key, setting) {
-        value = Redis.current.get("flags:#{key}")
+      reader: ->(setting) {
+        value = Redis.current.get("flags:#{setting[:env_key]}")
         value ? JSON.parse(value) : nil
       },
-      writer: ->(key, value, setting) {
-        Redis.current.set("flags:#{key}", value.to_json)
+      writer: ->(value, setting) {
+        Redis.current.set("flags:#{setting[:env_key]}", value.to_json)
       }
 end
 
@@ -676,9 +676,9 @@ class Env < EnvSettings::Base
   @vault_cache = {}
 
   var :secret_key,
-      reader: ->(key, setting) {
-        @vault_cache[key] ||= begin
-          secret = Vault.logical.read("secret/#{key}")
+      reader: ->(setting) {
+        @vault_cache[setting[:env_key]] ||= begin
+          secret = Vault.logical.read("secret/#{setting[:env_key]}")
           secret&.data&.dig(:data, :value)
         end
       }
@@ -689,12 +689,12 @@ end
 
 ```ruby
 class Env < EnvSettings::Base
-  default_writer ->(key, value, setting) {
-    old_value = Setting.get(key)
-    Setting.set(key, value)
+  default_writer ->(value, setting) {
+    old_value = Setting.get(setting[:env_key])
+    Setting.set(setting[:env_key], value)
 
     Rails.logger.info(
-      "Setting changed: #{key} = #{value.inspect} (was: #{old_value.inspect})"
+      "Setting changed: #{setting[:env_key]} = #{value.inspect} (was: #{old_value.inspect})"
     )
   }
 end
